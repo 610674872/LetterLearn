@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">字小乐</string>
+    <string name="title_activity_main">字小乐</string>
+    <string name="package_name">fun.lingai.letterlearn</string>
+    <string name="custom_url_scheme">fun.lingai.letterlearn</string>
+</resources>

@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Google Sans Text", "Roboto", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+
+  /* Material Design 3 Tonal Color System */
+  --md-sys-color-primary: #ba1a1a;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffdad6;
+  --md-sys-color-on-primary-container: #410002;
+  --md-sys-color-secondary: #775651;
+  --md-sys-color-secondary-container: #ffdad4;
+  --md-sys-color-on-secondary-container: #2c1512;
+  --md-sys-color-tertiary: #715b2e;
+  --md-sys-color-tertiary-container: #fde0a5;
+  --md-sys-color-on-tertiary-container: #261900;
+  --md-sys-color-surface: #fff8f6;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #fdf1ee;
+  --md-sys-color-surface-container: #f7ebe8;
+  --md-sys-color-surface-container-high: #f1e5e2;
+  --md-sys-color-surface-container-highest: #ebe0dd;
+  --md-sys-color-on-surface: #231918;
+  --md-sys-color-on-surface-variant: #534341;
+  --md-sys-color-outline: #857370;
+  --md-sys-color-outline-variant: #d8c2be;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  position: fixed;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* 楷体或教科书体汉字高亮风格 */
+.font-kaiti {
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "SimKai", serif;
+}
+
+/* 拼音声调字体优化 */
+.font-pinyin {
+  font-family: "Google Sans Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* 隐藏滚动条 */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Material Design 3 田字格米字格背景 */
+.tianzige-box {
+  position: relative;
+  border: 3px solid #ba1a1a;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(186, 26, 26, 0.08), inset 0 0 12px rgba(255, 218, 214, 0.25);
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+/* 十字虚线 */
+.tianzige-box::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed rgba(186, 26, 26, 0.3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tianzige-box::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed rgba(186, 26, 26, 0.3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 米字格对角辅助线 */
+.mizige-diag-1 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 141.42%;
+  height: 0;
+  transform-origin: 0 0;
+  transform: rotate(45deg);
+  border-top: 1.5px dotted rgba(186, 26, 26, 0.2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mizige-diag-2 {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 141.42%;
+  height: 0;
+  transform-origin: 100% 0;
+  transform: rotate(-45deg);
+  border-top: 1.5px dotted rgba(186, 26, 26, 0.2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Material Design 3 触控按压反馈动效 */
+.m3-press-active {
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.m3-press-active:active {
+  transform: scale(0.96);
+}
+
+/* M3 Elevation 阴影层级 */
+.m3-elevation-1 {
+  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+}
+.m3-elevation-2 {
+  box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+}
+.m3-elevation-3 {
+  box-shadow: 0 4px 8px 3px rgba(0, 0, 0, 0.08), 0 1px 3px 0 rgba(0, 0, 0, 0.14);
+}
