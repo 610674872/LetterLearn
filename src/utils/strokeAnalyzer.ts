@@ -1,4 +1,38 @@
 // 汉字整字书写笔顺与方向后置诊断算法
+import HanziWriter from 'hanzi-writer';
+
+/**
+ * 离线优先加载 HanziWriter 汉字骨架数据
+ * 具备 LocalStorage 本地持久化缓存与网络容错机制
+ */
+export async function loadCharacterDataWithCache(char: string): Promise<any> {
+  const cacheKey = `letterlearn_char_data_${char}`;
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  try {
+    const data = await HanziWriter.loadCharacterData(char);
+    if (data && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+      } catch {
+        // quota exceeded or private mode, safe to ignore
+      }
+    }
+    return data;
+  } catch (err) {
+    console.warn(`Failed to load online character data for ${char}:`, err);
+    throw err;
+  }
+}
 
 export interface Point {
   x: number;
@@ -243,8 +277,8 @@ export function analyzeCharacterStrokes(
   if (!isCharacterCorrect) {
     score = Math.max(10, Math.min(45, 60 - countDiff * 20));
     stars = 0;
-    summaryMessage = '这个字好像写错啦或漏画了，来看看标准写法吧！❌';
-    adviceList.unshift('字形或笔画不太对哦，注意观察田字格中标准字的每一笔。');
+    summaryMessage = '字形还差一点点就掌握啦，来看看标准写法，我们再练一次！🌱';
+    adviceList.unshift('别灰心，注意观察田字格中的起笔定位，跟着小老师慢放再试一次！');
   } else {
     if (!isCountCorrect) {
       score -= countDiff * 20;

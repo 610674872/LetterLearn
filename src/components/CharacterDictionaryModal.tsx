@@ -84,9 +84,10 @@ export const CharacterDictionaryModal: React.FC<CharacterDictionaryModalProps> =
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#fdf1ee] hover:bg-white text-[#775651] flex items-center justify-center transition m3-press-active cursor-pointer"
+            className="w-12 h-12 rounded-full bg-[#fdf1ee] hover:bg-white text-[#775651] flex items-center justify-center transition m3-press-active cursor-pointer"
+            title="关闭"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 

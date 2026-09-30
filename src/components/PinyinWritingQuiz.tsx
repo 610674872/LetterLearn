@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import HanziWriter from 'hanzi-writer';
 import confetti from 'canvas-confetti';
 import {
   Volume2,
@@ -14,7 +13,7 @@ import {
 import type { Lesson, CharacterItem } from '../types';
 import { speechService } from '../utils/speech';
 import { soundEffects } from '../utils/soundEffects';
-import { analyzeCharacterStrokes } from '../utils/strokeAnalyzer';
+import { analyzeCharacterStrokes, loadCharacterDataWithCache } from '../utils/strokeAnalyzer';
 import type { RawStroke, Point, StrokeDiagnosisResult } from '../utils/strokeAnalyzer';
 
 interface PinyinWritingQuizProps {
@@ -61,7 +60,7 @@ export const PinyinWritingQuiz: React.FC<PinyinWritingQuizProps> = ({
     // 播放题目拼音：简洁友好，只读拼音与词语，绝不提前剧透单字字形
     speechService.speak(`看拼音写生字：${currentItem.pinyin}。${currentWordObj ? currentWordObj.word : ''}`);
 
-    HanziWriter.loadCharacterData(currentItem.char)
+    loadCharacterDataWithCache(currentItem.char)
       .then((data: any) => {
         if (data && data.medians) {
           setStandardMedians(data.medians);

@@ -72,7 +72,11 @@ flowchart TD
 
 ---
 
-## 🛠️ 项目专属技能 (Project Skill)
+## 🛠️ 项目专属技能体系 (Project Skills)
 
-关于更详细的规范、标准参考数据与实操指导，请随时调用工程专属 Skill：
-- **`child-edu-product-design`**：位于 [`.agents/skills/child-edu-product-design/SKILL.md`](file:///Users/mac/work/personal/LetterLearn/.agents/skills/child-edu-product-design/SKILL.md)
+关于更详细的规范、标准参考数据与实操指导，请随时调用工程专属 Skills：
+1. **`child-edu-product-design`**：五位一体专家儿童教育产品设计与评审准则，见 [SKILL.md](file:///Users/mac/work/personal/LetterLearn/.agents/skills/child-edu-product-design/SKILL.md)
+2. **`letterlearn-child-ui-design`**：儿童 UI/交互设计守门与反馈蒸馏，见 [SKILL.md](file:///Users/mac/work/personal/LetterLearn/.agents/skills/letterlearn-child-ui-design/SKILL.md)
+3. **`letterlearn-iterative-delivery-loop`**：纵向迭代连续闭环交付机制，见 [SKILL.md](file:///Users/mac/work/personal/LetterLearn/.agents/skills/letterlearn-iterative-delivery-loop/SKILL.md)
+4. **`letterlearn-implementation-context`**：真实代码实现地图与架构核对，见 [SKILL.md](file:///Users/mac/work/personal/LetterLearn/.agents/skills/letterlearn-implementation-context/SKILL.md)
+5. **`letterlearn-requirement-memory`**：产品与教学决策历史记忆沉淀，见 [SKILL.md](file:///Users/mac/work/personal/LetterLearn/.agents/skills/letterlearn-requirement-memory/SKILL.md)

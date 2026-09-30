@@ -14,7 +14,9 @@ import { CharacterDictionaryModal } from './components/CharacterDictionaryModal'
 import { InstallAppModal } from './components/InstallAppModal';
 import { CurriculumDrawer } from './components/CurriculumDrawer';
 import { BottomTabBar } from './components/BottomTabBar';
+import { AudioSettingsModal } from './components/AudioSettingsModal';
 import { evaluateNewBadges } from './utils/badgeSystem';
+import { speechService } from './utils/speech';
 
 export function App() {
   const [currentGrade, setCurrentGrade] = useState<GradeLevel>(1);
@@ -87,6 +89,7 @@ export function App() {
   const [activeNewBadge, setActiveNewBadge] = useState<BadgeItem | null>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isCurriculumDrawerOpen, setIsCurriculumDrawerOpen] = useState(false);
+  const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
@@ -216,13 +219,25 @@ export function App() {
       let clearedCount = prev.clearedMistakesCount;
       const updatedMistakes = { ...prev.mistakes };
 
-      // 2星或3星即掌握该字，3星满星可消灭错题
+      // 2星或3星即掌握该字
       if (stars >= 2) {
         writtenSet.add(char);
       }
-      if (stars === 3 && updatedMistakes[char]) {
-        delete updatedMistakes[char];
-        clearedCount += 1;
+
+      if (updatedMistakes[char]) {
+        const currentStreak = (updatedMistakes[char].consecutiveSuccess || 0) + 1;
+        // 3星满星直接消灭，或者连续2次正确彻底消灭该错字
+        if (stars === 3 || currentStreak >= 2) {
+          delete updatedMistakes[char];
+          clearedCount += 1;
+        } else {
+          updatedMistakes[char] = {
+            ...updatedMistakes[char],
+            consecutiveSuccess: currentStreak,
+            ebinghausStage: Math.min(3, (updatedMistakes[char].ebinghausStage || 0) + 1),
+            lastDate: new Date().toISOString().split('T')[0],
+          };
+        }
       }
 
       const nextStats: UserLearningStats = {
@@ -321,6 +336,7 @@ export function App() {
         onOpenEyeCare={() => setIsEyeCareOpen(true)}
         onOpenBadgeWall={() => setIsBadgeWallOpen(true)}
         onOpenInstallApp={() => setIsInstallModalOpen(true)}
+        onOpenAudioSettings={() => setIsAudioSettingsOpen(true)}
         isAppInstalled={isAppInstalled}
       />
 
@@ -333,7 +349,10 @@ export function App() {
               <CharacterSelector
                 characters={currentLesson.characters}
                 selectedChar={currentCharItem.char}
-                onSelectCharacter={(item) => setCurrentCharItem(item)}
+                onSelectCharacter={(item) => {
+                  setCurrentCharItem(item);
+                  speechService.speak(`${item.char}，${item.pinyin}`);
+                }}
                 charProgress={charProgress}
               />
 
@@ -363,8 +382,12 @@ export function App() {
             <div className="animate-in fade-in duration-200">
               <DictationMaster
                 lesson={currentLesson}
-                onAddMistake={(char) => handleAddMistake(char, '听写写错')}
+                onAddMistake={(char) => handleAddMistake(char, '听写测验写错')}
                 onFinish={handleDictationFinished}
+                onFinishExam={(score, stars) => {
+                  setStarsCount((prev) => prev + stars * 3);
+                  setInkCount((prev) => prev + Math.round(score / 2));
+                }}
               />
             </div>
           )}
@@ -406,6 +429,7 @@ export function App() {
         isOpen={isErrorBookOpen}
         onClose={() => setIsErrorBookOpen(false)}
         mistakes={mistakeCharList}
+        mistakeRecords={learningStats.mistakes}
         onSelectCharacter={(char) => {
           const match = currentLesson.characters.find((c) => c.char === char) || currentCharItem;
           handleSelectCharacterToPractice(match);
@@ -419,6 +443,9 @@ export function App() {
       <EyeCareModal
         isOpen={isEyeCareOpen}
         onClose={() => setIsEyeCareOpen(false)}
+        onRewardEyeCareStar={() => {
+          setStarsCount((prev) => prev + 1);
+        }}
       />
 
       {/* 弹窗：安装到手机 */}
@@ -439,6 +466,12 @@ export function App() {
         onSelectCurriculum={handleSelectCurriculum}
         onSelectLesson={handleSelectLesson}
         charProgress={charProgress}
+      />
+
+      {/* 弹窗：声音与发音排查与设置 */}
+      <AudioSettingsModal
+        isOpen={isAudioSettingsOpen}
+        onClose={() => setIsAudioSettingsOpen(false)}
       />
     </div>
   );

@@ -1,6 +1,8 @@
-import React from 'react';
-import { BookOpen, Award, ChevronDown, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Award, ChevronDown, Smartphone, Volume2, VolumeX } from 'lucide-react';
 import type { GradeLevel, SemesterLevel, Lesson } from '../types';
+import { soundEffects } from '../utils/soundEffects';
+import { speechService } from '../utils/speech';
 
 interface NavbarProps {
   currentGrade: GradeLevel;
@@ -15,6 +17,7 @@ interface NavbarProps {
   onOpenEyeCare: () => void;
   onOpenBadgeWall: () => void;
   onOpenInstallApp: () => void;
+  onOpenAudioSettings?: () => void;
   isAppInstalled?: boolean;
 }
 
@@ -31,9 +34,36 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenEyeCare,
   onOpenBadgeWall,
   onOpenInstallApp,
+  onOpenAudioSettings,
   isAppInstalled,
 }) => {
-  const shortCurriculumLabel = `${currentGrade === 1 ? '一' : '二'}${currentSemester === 1 ? '上' : '下'}`;
+  const gradeChinese = ['一', '二', '三', '四', '五', '六'];
+  const shortCurriculumLabel = `${gradeChinese[currentGrade - 1] || '一'}${currentSemester === 1 ? '上' : '下'}`;
+  const [isMuted, setIsMuted] = useState<boolean>(() => soundEffects.getMuted());
+
+  useEffect(() => {
+    const unsub = soundEffects.subscribeMuteChange((muted) => {
+      setIsMuted(muted);
+    });
+    return unsub;
+  }, []);
+
+  const handleSoundButtonClick = () => {
+    if (isMuted) {
+      // 若当前静音，点击直接解除静音，激活音频并播放提示
+      soundEffects.setMuted(false);
+      soundEffects.unlockAudioContext();
+      soundEffects.playStrokeSuccess();
+      speechService.speak('声音已开启');
+    } else {
+      // 若已开启，点击打开声音诊断与测试面板
+      if (onOpenAudioSettings) {
+        onOpenAudioSettings();
+      } else {
+        soundEffects.toggleMute();
+      }
+    }
+  };
 
   return (
     <header className="shrink-0 w-full bg-[#fff8f6]/95 backdrop-blur-md sticky top-0 z-40 border-b border-[#d8c2be]/50 pt-[env(safe-area-inset-top)]">
@@ -82,10 +112,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>{inkCount}</span>
           </div>
 
+          {/* M3 IconButton: 声音排查与控制 */}
+          <button
+            onClick={handleSoundButtonClick}
+            className={`w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] rounded-full flex items-center justify-center transition m3-press-active cursor-pointer relative ${
+              isMuted
+                ? 'bg-[#ffdad6] text-[#ba1a1a] hover:bg-[#ffb4ab]'
+                : 'hover:bg-[#f7ebe8] text-[#534341]'
+            }`}
+            title={isMuted ? '当前已静音（点击解除静音）' : '声音设置与测试（点击排查发音）'}
+          >
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-[#ba1a1a]" />
+            ) : (
+              <Volume2 className="w-5 h-5 text-[#ba1a1a]" />
+            )}
+          </button>
+
           {/* M3 IconButton: 奖状 */}
           <button
             onClick={onOpenBadgeWall}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-[#f7ebe8] text-[#534341] flex items-center justify-center transition m3-press-active relative cursor-pointer"
+            className="w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] rounded-full hover:bg-[#f7ebe8] text-[#534341] flex items-center justify-center transition m3-press-active relative cursor-pointer"
             title="查看奖状馆"
           >
             <Award className="w-5 h-5 text-[#ba1a1a]" />
@@ -99,19 +146,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* M3 IconButton: 错题 */}
           <button
             onClick={onOpenErrorBook}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-[#f7ebe8] text-[#534341] flex items-center justify-center transition m3-press-active relative cursor-pointer"
+            className="w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] rounded-full hover:bg-[#f7ebe8] text-[#534341] flex items-center justify-center transition m3-press-active relative cursor-pointer"
             title="查看错题本"
           >
             <BookOpen className="w-5 h-5 text-[#775651]" />
             {mistakesCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#ba1a1a]" />
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#ba1a1a]" />
             )}
           </button>
 
           {/* M3 IconButton: 安装/运行指示 */}
           <button
             onClick={onOpenInstallApp}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition m3-press-active cursor-pointer ${
+            className={`w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] rounded-full flex items-center justify-center transition m3-press-active cursor-pointer ${
               isAppInstalled
                 ? 'text-[#2e7d32] hover:bg-[#e8f5e9]'
                 : 'text-[#ba1a1a] hover:bg-[#ffdad6]'
@@ -124,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* 护眼 */}
           <button
             onClick={onOpenEyeCare}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-[#f7ebe8] text-base flex items-center justify-center transition m3-press-active cursor-pointer"
+            className="w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] sm:min-w-[48px] sm:min-h-[48px] rounded-full hover:bg-[#f7ebe8] text-lg flex items-center justify-center transition m3-press-active cursor-pointer"
             title="护眼模式"
           >
             🦖

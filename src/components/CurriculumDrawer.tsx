@@ -30,11 +30,18 @@ export const CurriculumDrawer: React.FC<CurriculumDrawerProps> = ({
     (c) => c.grade === currentGrade && c.semester === currentSemester
   ) || PEP_CURRICULUM_DATA[0];
 
-  const gradeSemesterOptions: { grade: GradeLevel; semester: SemesterLevel; label: string }[] = [
-    { grade: 1, semester: 1, label: '一年级上' },
-    { grade: 1, semester: 2, label: '一年级下' },
-    { grade: 2, semester: 1, label: '二年级上' },
-    { grade: 2, semester: 2, label: '二年级下' },
+  const grades: { grade: GradeLevel; label: string }[] = [
+    { grade: 1, label: '一年级' },
+    { grade: 2, label: '二年级' },
+    { grade: 3, label: '三年级' },
+    { grade: 4, label: '四年级' },
+    { grade: 5, label: '五年级' },
+    { grade: 6, label: '六年级' },
+  ];
+
+  const semesters: { semester: SemesterLevel; label: string }[] = [
+    { semester: 1, label: '上册 🍂' },
+    { semester: 2, label: '下册 🌸' },
   ];
 
   return (
@@ -58,10 +65,10 @@ export const CurriculumDrawer: React.FC<CurriculumDrawerProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-[#231918]">
-                选择教材课文
+                选择人教版教材（一至六年级）
               </h3>
               <p className="text-[11px] text-[#775651]">
-                部编小学语文《写字表》全量同步
+                小学语文统编教科书 · 听说读写全学段同步
               </p>
             </div>
           </div>
@@ -73,23 +80,44 @@ export const CurriculumDrawer: React.FC<CurriculumDrawerProps> = ({
           </button>
         </div>
 
-        {/* M3 Connected Segmented Button (分段单选按钮) */}
-        <div className="px-4 py-2.5 bg-[#fdf1ee] border-b border-[#d8c2be]/40 shrink-0">
-          <div className="flex border border-[#857370]/40 rounded-full overflow-hidden p-0.5 bg-[#fff8f6]">
-            {gradeSemesterOptions.map((opt) => {
-              const isSelected = opt.grade === currentGrade && opt.semester === currentSemester;
+        {/* 年级与学期两级选择器 (高容错、大触控热区) */}
+        <div className="px-4 py-2.5 bg-[#fdf1ee] border-b border-[#d8c2be]/40 shrink-0 space-y-2">
+          {/* 一级：1~6 年级平铺选择 */}
+          <div className="grid grid-cols-6 gap-1 bg-[#fff8f6] p-1 rounded-2xl border border-[#857370]/20">
+            {grades.map((g) => {
+              const isSelected = g.grade === currentGrade;
               return (
                 <button
-                  key={`${opt.grade}-${opt.semester}`}
-                  onClick={() => onSelectCurriculum(opt.grade, opt.semester)}
-                  className={`flex-1 py-2 px-1 text-xs font-bold transition-all cursor-pointer rounded-full flex items-center justify-center gap-1 m3-press-active ${
+                  key={g.grade}
+                  onClick={() => onSelectCurriculum(g.grade, currentSemester)}
+                  className={`py-2 text-xs font-bold transition-all cursor-pointer rounded-xl flex items-center justify-center m3-press-active ${
+                    isSelected
+                      ? 'bg-[#ba1a1a] text-white shadow-xs'
+                      : 'text-[#534341] hover:bg-[#f7ebe8]'
+                  }`}
+                >
+                  {g.label.replace('年级', '')}年
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 二级：上册 / 下册选择 */}
+          <div className="flex border border-[#857370]/30 rounded-full overflow-hidden p-0.5 bg-[#fff8f6] max-w-xs mx-auto">
+            {semesters.map((s) => {
+              const isSelected = s.semester === currentSemester;
+              return (
+                <button
+                  key={s.semester}
+                  onClick={() => onSelectCurriculum(currentGrade, s.semester)}
+                  className={`flex-1 py-1.5 px-3 text-xs font-bold transition-all cursor-pointer rounded-full flex items-center justify-center gap-1.5 m3-press-active ${
                     isSelected
                       ? 'bg-[#ffdad6] text-[#410002] shadow-xs'
                       : 'text-[#534341] hover:bg-[#f7ebe8]'
                   }`}
                 >
                   {isSelected && <Check className="w-3.5 h-3.5 text-[#410002]" />}
-                  <span>{opt.label}</span>
+                  <span>{s.label}</span>
                 </button>
               );
             })}
@@ -100,11 +128,27 @@ export const CurriculumDrawer: React.FC<CurriculumDrawerProps> = ({
         <div className="p-4 overflow-y-auto space-y-4 overscroll-contain flex-1">
           {currentCurriculum.units.map((unit) => (
             <div key={unit.unitNumber} className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <span className="w-1.5 h-3.5 rounded-full bg-[#ba1a1a]" />
-                <h4 className="text-xs font-bold text-[#775651] tracking-wider uppercase">
-                  {unit.title}
-                </h4>
+              <div className="flex flex-col gap-1 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-3.5 rounded-full bg-[#ba1a1a]" />
+                  <h4 className="text-xs font-bold text-[#775651] tracking-wider uppercase">
+                    {unit.title}
+                  </h4>
+                </div>
+                {(unit.oralCommunication || unit.accumulation) && (
+                  <div className="flex items-center gap-1.5 ml-3.5 flex-wrap">
+                    {unit.oralCommunication && (
+                      <span className="text-[10px] bg-[#e8def8] text-[#4a4458] px-2 py-0.5 rounded-full font-medium">
+                        🗣️ {unit.oralCommunication.title}
+                      </span>
+                    )}
+                    {unit.accumulation && (
+                      <span className="text-[10px] bg-[#d0e4ff] text-[#004a77] px-2 py-0.5 rounded-full font-medium">
+                        📖 {unit.accumulation.title}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

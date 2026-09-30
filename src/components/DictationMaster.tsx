@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import HanziWriter from 'hanzi-writer';
 import confetti from 'canvas-confetti';
 import {
   Volume2,
@@ -14,44 +13,43 @@ import {
   Settings,
   Award,
   Sparkles,
-  Undo2,
-  CheckCircle2,
-  AlertCircle
+  ArrowRight
 } from 'lucide-react';
 import type { Lesson, DictationType, DictationResult } from '../types';
 import { speechService } from '../utils/speech';
-import { soundEffects } from '../utils/soundEffects';
-import { analyzeCharacterStrokes } from '../utils/strokeAnalyzer';
-import type { RawStroke, Point, StrokeDiagnosisResult } from '../utils/strokeAnalyzer';
+import { DictationExamModal } from './DictationExamModal';
 
 interface DictationMasterProps {
   lesson: Lesson;
   onFinish?: (results: DictationResult[]) => void;
-  onAddMistake?: (char: string) => void;
+  onAddMistake?: (char: string, reason?: string) => void;
+  onFinishExam?: (score: number, stars: number, failedChars: string[]) => void;
 }
 
 export const DictationMaster: React.FC<DictationMasterProps> = ({
   lesson,
   onFinish,
   onAddMistake,
+  onFinishExam,
 }) => {
   const words = lesson.dictationWords;
 
-  const [mode, setMode] = useState<DictationType>('screen'); // 默认屏幕沉浸写字模式
+  const [mode, setMode] = useState<DictationType>('screen'); // 'screen' = 正式全屏测验入口, 'paper' = 纸上伴读
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+
+  // 纸上伴读模式专属状态
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [repeatCount, setRepeatCount] = useState<1 | 2>(2);
   const [intervalSeconds, setIntervalSeconds] = useState<number>(8);
   const [countdown, setCountdown] = useState<number>(8);
-  const [isFinished, setIsFinished] = useState(false);
-
-  // 记录每个词语的核对结果
+  const [isPaperFinished, setIsPaperFinished] = useState(false);
   const [checkResults, setCheckResults] = useState<{ [word: string]: boolean }>({});
 
   const timerRef = useRef<any>(null);
   const currentItem = words[currentIndex];
 
-  // 朗读当前词语（注意：绝不提前报出单个字的写法，只读词语和例句）
+  // 纸上听写朗读
   const announceCurrentWord = (index: number) => {
     const item = words[index];
     if (!item) return;
@@ -63,9 +61,9 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
     }
   };
 
-  // 纸上听写自动伴读计时器
+  // 纸上伴读计时逻辑
   useEffect(() => {
-    if (mode !== 'paper' || !isPlaying || isFinished) return;
+    if (mode !== 'paper' || !isPlaying || isPaperFinished) return;
 
     announceCurrentWord(currentIndex);
     setCountdown(intervalSeconds);
@@ -79,8 +77,8 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
           } else {
             clearInterval(timerRef.current);
             setIsPlaying(false);
-            setIsFinished(true);
-            speechService.speak('所有词语播报完毕！请家长和孩子一起核对批改。', 1.0);
+            setIsPaperFinished(true);
+            speechService.speak('所有词语播报完毕！请家长和孩子一起对照标准答案批改。', 1.0);
             return 0;
           }
         }
@@ -91,9 +89,9 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isPlaying, currentIndex, mode, intervalSeconds, repeatCount, isFinished]);
+  }, [isPlaying, currentIndex, mode, intervalSeconds, repeatCount, isPaperFinished, words.length]);
 
-  const handleNextWord = () => {
+  const handleNextPaperWord = () => {
     if (currentIndex < words.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setCountdown(intervalSeconds);
@@ -101,19 +99,15 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
         announceCurrentWord(currentIndex + 1);
       }
     } else {
-      setIsFinished(true);
+      setIsPaperFinished(true);
       setIsPlaying(false);
-      speechService.speak('听写已完成！我们来对对答案吧。');
+      speechService.speak('纸上听写已播报完毕！我们来对对答案吧。');
     }
   };
 
-  const handleRepeatCurrent = () => {
-    announceCurrentWord(currentIndex);
-  };
-
-  const handleRestart = () => {
+  const handleRestartPaper = () => {
     setCurrentIndex(0);
-    setIsFinished(false);
+    setIsPaperFinished(false);
     setIsPlaying(false);
     setCountdown(intervalSeconds);
     setCheckResults({});
@@ -127,12 +121,12 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
 
     if (!passed) {
       for (const char of word) {
-        onAddMistake?.(char);
+        onAddMistake?.(char, '纸上听写批改失误');
       }
     }
   };
 
-  if (!currentItem && !isFinished) {
+  if (!currentItem && !isPaperFinished && words.length === 0) {
     return (
       <div className="p-8 text-center text-[#534341]">
         本课暂未录入听写词语
@@ -143,18 +137,18 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
       {/* M3 Card Container */}
-      <div className="w-full bg-[#fff8f6] rounded-[28px] p-3.5 sm:p-5 border border-[#d8c2be]/60 shadow-xs flex flex-col items-center">
-        {/* 顶部标题与 M3 Connected Segmented Button */}
-        <div className="w-full flex flex-col sm:flex-row items-center justify-between pb-2.5 mb-3 border-b border-[#d8c2be]/40 gap-2.5">
+      <div className="w-full bg-[#fff8f6] rounded-[28px] p-4 sm:p-6 border border-[#d8c2be]/60 shadow-xs flex flex-col items-center">
+        {/* 顶部标题与模式切换 */}
+        <div className="w-full flex flex-col sm:flex-row items-center justify-between pb-3 mb-4 border-b border-[#d8c2be]/40 gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-[#231918] flex items-center gap-2">
-              <span>课后同步听写</span>
+              <span>部编版同步听写</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#ffdad6] text-[#410002] font-extrabold">
                 {lesson.title}
               </span>
             </h2>
             <p className="text-[11px] text-[#775651] mt-0.5">
-              共 {words.length} 个词语 · 不提示字形 · 写完再批改
+              共 {words.length} 个词语 · 严格考标 · 规范书写
             </p>
           </div>
 
@@ -163,23 +157,23 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
             <button
               onClick={() => {
                 setMode('screen');
-                handleRestart();
+                setIsPlaying(false);
               }}
-              className={`py-1.5 px-3 text-xs font-bold transition-all rounded-full flex items-center gap-1 cursor-pointer m3-press-active ${
+              className={`py-1.5 px-3.5 text-xs font-bold transition-all rounded-full flex items-center gap-1.5 cursor-pointer m3-press-active ${
                 mode === 'screen'
                   ? 'bg-[#ba1a1a] text-white shadow-xs'
                   : 'text-[#534341] hover:bg-[#fff8f6]'
               }`}
             >
               <Tablet className="w-3.5 h-3.5" />
-              <span>屏幕默写 📱</span>
+              <span>全屏测验 📱</span>
             </button>
             <button
               onClick={() => {
                 setMode('paper');
-                handleRestart();
+                handleRestartPaper();
               }}
-              className={`py-1.5 px-3 text-xs font-bold transition-all rounded-full flex items-center gap-1 cursor-pointer m3-press-active ${
+              className={`py-1.5 px-3.5 text-xs font-bold transition-all rounded-full flex items-center gap-1.5 cursor-pointer m3-press-active ${
                 mode === 'paper'
                   ? 'bg-[#ba1a1a] text-white shadow-xs'
                   : 'text-[#534341] hover:bg-[#fff8f6]'
@@ -191,30 +185,91 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
           </div>
         </div>
 
-        {/* 模式 1：屏幕手写默写 (不提前显示字、书写不打断、写完判笔顺与字对错) */}
-        {mode === 'screen' && !isFinished && (
-          <ScreenNonInterruptDictationPad
-            key={currentItem.word}
-            wordItem={currentItem}
-            currentIndex={currentIndex}
-            totalCount={words.length}
-            onNextWord={handleNextWord}
-            onPassWord={() => {
-              handleToggleCheck(currentItem.word, true);
-              handleNextWord();
-            }}
-            onFailWord={() => {
-              handleToggleCheck(currentItem.word, false);
-              handleNextWord();
-            }}
-          />
+        {/* ================================================================= */}
+        {/* 方案 A：正式全屏听写测验推荐入口卡片 */}
+        {/* ================================================================= */}
+        {mode === 'screen' && (
+          <div className="w-full flex flex-col items-center py-2 animate-in fade-in duration-200">
+            <div className="w-full bg-[#fdf1ee] rounded-[24px] p-5 sm:p-6 border border-[#d8c2be]/60 flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-3 shadow-xs">
+                <Sparkles className="w-8 h-8 fill-current" />
+              </div>
+
+              <h3 className="text-lg font-extrabold text-[#231918] mb-1">
+                开启课后听写正式测验
+              </h3>
+              <p className="text-xs text-[#775651] max-w-md leading-relaxed mb-4">
+                进入独立全屏考场，排除主界面干扰。田字格根据单字/双字动态匹配格数，作答中途零打扰，交卷后全卷诊断打分！
+              </p>
+
+              {/* 核心亮点标签 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-lg mb-5 text-left">
+                <div className="bg-white/80 p-2.5 rounded-xl border border-[#d8c2be]/50 text-xs">
+                  <div className="font-bold text-[#ba1a1a] flex items-center gap-1">
+                    <span>🌟 独立全屏</span>
+                  </div>
+                  <div className="text-[11px] text-[#775651] mt-0.5">
+                    隐藏顶部底栏，沉浸零干扰
+                  </div>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-xl border border-[#d8c2be]/50 text-xs">
+                  <div className="font-bold text-[#ba1a1a] flex items-center gap-1">
+                    <span>📐 多格排版</span>
+                  </div>
+                  <div className="text-[11px] text-[#775651] mt-0.5">
+                    单字单格、双字并排双格
+                  </div>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-xl border border-[#d8c2be]/50 text-xs">
+                  <div className="font-bold text-[#ba1a1a] flex items-center gap-1">
+                    <span>🏆 考后判分</span>
+                  </div>
+                  <div className="text-[11px] text-[#775651] mt-0.5">
+                    答完交卷，生成100分成绩单
+                  </div>
+                </div>
+              </div>
+
+              {/* 本课听写词语预览胶囊 */}
+              <div className="w-full max-w-lg bg-white/60 p-3 rounded-2xl border border-[#d8c2be]/40 mb-5">
+                <div className="text-[11px] font-bold text-[#775651] mb-2 flex items-center justify-between">
+                  <span>本课待测词语清单:</span>
+                  <span>{words.length} 个词</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {words.map((w, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-lg bg-[#fdf1ee] border border-[#d8c2be]/50 text-xs font-bold text-[#231918] font-kaiti"
+                    >
+                      {w.word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 大尺寸主操作 CTA 按钮 (触控热区 >= 56px) */}
+              <button
+                onClick={() => setIsExamModalOpen(true)}
+                className="w-full max-w-md min-h-[56px] rounded-full bg-[#ba1a1a] hover:bg-[#9c1515] text-white text-base font-bold shadow-md flex items-center justify-center gap-2 transition m3-press-active cursor-pointer"
+              >
+                <Sparkles className="w-5 h-5 fill-current" />
+                <span>进入全屏听写考场 🚀</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* 模式 2：纸上伴读模式 UI */}
-        {mode === 'paper' && !isFinished && (
-          <div className="w-full flex flex-col items-center my-2">
+        {/* ================================================================= */}
+        {/* 方案 B：纸上伴读模式 (保护视力 · 实体纸笔书写) */}
+        {/* ================================================================= */}
+        {mode === 'paper' && !isPaperFinished && (
+          <div className="w-full flex flex-col items-center my-1 animate-in fade-in duration-200">
             {/* 参数调优条 */}
-            <div className="w-full bg-[#fdf1ee] p-3 rounded-[20px] border border-[#d8c2be]/60 flex flex-wrap items-center justify-between gap-3 text-xs text-[#231918] mb-5">
+            <div className="w-full bg-[#fdf1ee] p-3 rounded-[20px] border border-[#d8c2be]/60 flex flex-wrap items-center justify-between gap-3 text-xs text-[#231918] mb-4">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[#ba1a1a]" />
                 <span className="font-bold">伴读设置:</span>
@@ -251,23 +306,22 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
               </div>
             </div>
 
-            {/* 纸上听写播报大卡片：绝不显示中文字，只显示拼音 */}
+            {/* 纸上听写大卡片：绝不显示中文字，只显示拼音 */}
             <div className="w-full bg-[#fdf1ee] p-6 rounded-[24px] border border-[#d8c2be]/60 flex flex-col items-center">
               <div className="flex items-center gap-2 text-xs font-bold bg-[#ffdad6] text-[#410002] px-3.5 py-1 rounded-full mb-3">
                 <span>第 {currentIndex + 1} / {words.length} 词</span>
               </div>
 
-              {/* 仅显示拼音与声音，绝不显示汉字 */}
               <div className="my-2 text-center">
                 <div className="text-3xl sm:text-4xl font-extrabold text-[#ba1a1a] font-pinyin tracking-widest">
                   {currentItem.pinyin}
                 </div>
                 <div className="text-xs text-[#775651] mt-2">
-                  请在听写本上写下这个词语，不要偷看哦 ✏️
+                  请在听写本上认真书写这个词语 ✏️
                 </div>
               </div>
 
-              {/* 进度条 */}
+              {/* 倒计时条 */}
               <div className="w-full my-4 flex flex-col items-center">
                 <div className="text-xs text-[#775651] font-bold mb-1">
                   倒计时: {countdown} 秒
@@ -280,11 +334,11 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
                 </div>
               </div>
 
-              {/* M3 控制按钮 */}
+              {/* 控制按钮区 */}
               <div className="flex items-center gap-3 mt-1">
                 <button
-                  onClick={handleRepeatCurrent}
-                  className="w-11 h-11 rounded-full bg-white border border-[#d8c2be] hover:bg-[#fff8f6] text-[#ba1a1a] flex items-center justify-center shadow-xs transition m3-press-active cursor-pointer"
+                  onClick={() => announceCurrentWord(currentIndex)}
+                  className="w-12 h-12 rounded-full bg-white border border-[#d8c2be] hover:bg-[#fff8f6] text-[#ba1a1a] flex items-center justify-center shadow-xs transition m3-press-active cursor-pointer"
                   title="再读一次"
                 >
                   <Volume2 className="w-5 h-5" />
@@ -292,24 +346,24 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
 
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
-                  className="px-6 py-2.5 rounded-full bg-[#ba1a1a] hover:bg-[#9c1515] text-white font-bold text-sm shadow-xs flex items-center gap-2 transition m3-press-active cursor-pointer"
+                  className="px-6 py-3 min-h-[48px] rounded-full bg-[#ba1a1a] hover:bg-[#9c1515] text-white font-bold text-sm shadow-xs flex items-center gap-2 transition m3-press-active cursor-pointer"
                 >
                   {isPlaying ? (
                     <>
-                      <Pause className="w-4 h-4 fill-current" />
+                      <Pause className="w-5 h-5 fill-current" />
                       <span>暂停</span>
                     </>
                   ) : (
                     <>
-                      <Play className="w-4 h-4 fill-current" />
+                      <Play className="w-5 h-5 fill-current" />
                       <span>开始播放</span>
                     </>
                   )}
                 </button>
 
                 <button
-                  onClick={handleNextWord}
-                  className="w-11 h-11 rounded-full bg-white border border-[#d8c2be] hover:bg-[#fff8f6] text-[#231918] flex items-center justify-center shadow-xs transition m3-press-active cursor-pointer"
+                  onClick={handleNextPaperWord}
+                  className="w-12 h-12 rounded-full bg-white border border-[#d8c2be] hover:bg-[#fff8f6] text-[#231918] flex items-center justify-center shadow-xs transition m3-press-active cursor-pointer"
                   title="下一词"
                 >
                   <SkipForward className="w-5 h-5" />
@@ -319,21 +373,21 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
           </div>
         )}
 
-        {/* 听写完成总结与对答案批改列表 */}
-        {isFinished && (
+        {/* 纸上伴读完成总结与批改清单 */}
+        {mode === 'paper' && isPaperFinished && (
           <div className="w-full bg-[#fdf1ee] p-5 rounded-[24px] border border-[#d8c2be]/60 animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-3 pb-3 border-b border-[#d8c2be]/40">
               <div className="flex items-center gap-2">
                 <Award className="w-6 h-6 text-[#ba1a1a]" />
                 <h3 className="font-bold text-[#231918] text-base">
-                  听写结束！对照标准答案批改 📝
+                  听写播报结束！对照标准答案批改 📝
                 </h3>
               </div>
               <button
-                onClick={handleRestart}
+                onClick={handleRestartPaper}
                 className="text-xs font-bold text-[#ba1a1a] hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> 重新听写
+                <RotateCcw className="w-3.5 h-3.5" /> 重新播报
               </button>
             </div>
 
@@ -361,28 +415,28 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => handleToggleCheck(item.word, true)}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition cursor-pointer m3-press-active ${
+                        className={`w-11 h-11 rounded-full flex items-center justify-center transition cursor-pointer m3-press-active ${
                           status === true
-                            ? 'bg-[#2e7d32] text-white font-bold'
+                            ? 'bg-[#2e7d32] text-white font-bold shadow-xs'
                             : 'bg-[#fdf1ee] text-[#857370] hover:bg-[#e8f5e9] hover:text-[#2e7d32]'
                         }`}
                         title="正确"
                       >
-                        <Check className="w-4 h-4 stroke-[2.5]" />
+                        <Check className="w-5 h-5 stroke-[2.5]" />
                       </button>
                       <button
                         onClick={() => handleToggleCheck(item.word, false)}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition cursor-pointer m3-press-active ${
+                        className={`w-11 h-11 rounded-full flex items-center justify-center transition cursor-pointer m3-press-active ${
                           status === false
-                            ? 'bg-[#ba1a1a] text-white font-bold'
+                            ? 'bg-[#ba1a1a] text-white font-bold shadow-xs'
                             : 'bg-[#fdf1ee] text-[#857370] hover:bg-[#ffdad6] hover:text-[#ba1a1a]'
                         }`}
                         title="错误"
                       >
-                        <X className="w-4 h-4 stroke-[2.5]" />
+                        <X className="w-5 h-5 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
@@ -409,331 +463,26 @@ export const DictationMaster: React.FC<DictationMasterProps> = ({
           </div>
         )}
       </div>
-    </div>
-  );
-};
 
-// ============================================================================
-// 屏幕听写子组件：不提前显字、书写不打断、写完再判字与笔顺
-// ============================================================================
-interface ScreenNonInterruptDictationPadProps {
-  wordItem: { word: string; pinyin: string; sentence: string };
-  currentIndex: number;
-  totalCount: number;
-  onNextWord: () => void;
-  onPassWord: () => void;
-  onFailWord: () => void;
-}
-
-const ScreenNonInterruptDictationPad: React.FC<ScreenNonInterruptDictationPadProps> = ({
-  wordItem,
-  currentIndex,
-  totalCount,
-  onPassWord,
-  onFailWord,
-}) => {
-  const chars = wordItem.word.split('');
-  const [activeCharIndex, setActiveCharIndex] = useState(0);
-  const currentChar = chars[activeCharIndex];
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawnStrokes, setDrawnStrokes] = useState<RawStroke[]>([]);
-  const [currentStroke, setCurrentStroke] = useState<RawStroke | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [standardMedians, setStandardMedians] = useState<number[][][]>([]);
-  const [strokeNames, setStrokeNames] = useState<string[]>([]);
-
-  // 诊断结果：书写完成后才产生
-  const [diagnosis, setDiagnosis] = useState<StrokeDiagnosisResult | null>(null);
-  const [showAnswer, setShowAnswer] = useState(false);
-
-  const CANVAS_SIZE = 260;
-
-  // 预载当前待写字的骨架数据（用于后置判断笔顺和字形）
-  useEffect(() => {
-    if (!currentChar) return;
-    setDrawnStrokes([]);
-    setDiagnosis(null);
-    setShowAnswer(false);
-
-    // 播放题目音频：只读词语和拼音，不提前把字剧透
-    speechService.speak(`请听写词语：${wordItem.word}。请写第 ${activeCharIndex + 1} 个字。`);
-
-    HanziWriter.loadCharacterData(currentChar)
-      .then((data: any) => {
-        if (data && data.medians) {
-          setStandardMedians(data.medians);
-          setStrokeNames(data.strokeNames || []);
-        }
-      })
-      .catch((err) => {
-        console.warn('Load char data error:', err);
-      });
-  }, [currentChar, activeCharIndex, wordItem.word]);
-
-  // 重绘画布上的墨迹
-  const redraw = (strokes: RawStroke[]) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    strokes.forEach((stroke) => {
-      if (stroke.length === 0) return;
-      ctx.beginPath();
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 14;
-
-      ctx.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < stroke.length; i++) {
-        ctx.lineTo(stroke[i].x, stroke[i].y);
-      }
-      ctx.stroke();
-    });
-  };
-
-  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-      time: Date.now(),
-    };
-  };
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (diagnosis) return; // 已判分后不可再画
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDrawing(true);
-    const p = getCanvasPoint(e);
-    const newStroke = [p];
-    setCurrentStroke(newStroke);
-    redraw([...drawnStrokes, newStroke]);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentStroke) return;
-    const p = getCanvasPoint(e);
-    const updated = [...currentStroke, p];
-    setCurrentStroke(updated);
-    redraw([...drawnStrokes, updated]);
-  };
-
-  const handlePointerUp = () => {
-    if (!isDrawing || !currentStroke) return;
-    setIsDrawing(false);
-    if (currentStroke.length > 1) {
-      const updated = [...drawnStrokes, currentStroke];
-      setDrawnStrokes(updated);
-      redraw(updated);
-      soundEffects.playStrokeSuccess();
-    }
-    setCurrentStroke(null);
-  };
-
-  // 撤销一笔
-  const handleUndo = () => {
-    if (drawnStrokes.length === 0 || diagnosis) return;
-    const updated = drawnStrokes.slice(0, -1);
-    setDrawnStrokes(updated);
-    redraw(updated);
-  };
-
-  // 清空
-  const handleClear = () => {
-    if (diagnosis) return;
-    setDrawnStrokes([]);
-    redraw([]);
-  };
-
-  // 核心：书写完成后一并判断字对不对、笔顺对不对
-  const handleEvaluate = () => {
-    if (drawnStrokes.length === 0) return;
-
-    const result = analyzeCharacterStrokes(
-      drawnStrokes,
-      CANVAS_SIZE,
-      CANVAS_SIZE,
-      standardMedians,
-      strokeNames
-    );
-
-    setDiagnosis(result);
-    setShowAnswer(true);
-
-    if (result.isCharacterCorrect && result.isOrderCorrect) {
-      soundEffects.playCharacterComplete();
-      confetti({ particleCount: 40, spread: 50 });
-      speechService.speak(`太棒啦！「${currentChar}」字写对了，笔顺完全规范！`);
-    } else if (result.isCharacterCorrect) {
-      soundEffects.playStarReward();
-      speechService.speak(`字写对了！不过有倒插笔哦，注意标准笔顺。`);
-    } else {
-      soundEffects.playStrokeMistake();
-      speechService.speak(`这个字好像写错啦，这是「${currentChar}」字，来看看标准答案吧。`);
-    }
-  };
-
-  // 进入词语的下一个字，或者完成该词
-  const handleNextCharOrFinish = () => {
-    const passed = diagnosis?.isCharacterCorrect ?? false;
-    if (activeCharIndex < chars.length - 1) {
-      setActiveCharIndex((prev) => prev + 1);
-    } else {
-      if (passed) {
-        onPassWord();
-      } else {
-        onFailWord();
-      }
-    }
-  };
-
-  return (
-    <div className="w-full flex flex-col items-center my-0.5">
-      {/* 题头：仅展示拼音与题号，绝不提前显示字！ */}
-      <div className="w-full text-center mb-2">
-        <div className="inline-flex items-center gap-2 px-3 py-0.5 bg-[#fdf1ee] border border-[#d8c2be]/60 rounded-full text-xs font-bold text-[#ba1a1a] mb-1.5">
-          <span>第 {currentIndex + 1} / {totalCount} 词</span>
-          <span>·</span>
-          <span>正在写第 {activeCharIndex + 1} 个字</span>
-        </div>
-
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-3xl sm:text-4xl font-extrabold text-[#ba1a1a] font-pinyin tracking-widest">
-            {wordItem.pinyin}
-          </span>
-          <button
-            onClick={() => speechService.speak(wordItem.word)}
-            className="w-9 h-9 rounded-full bg-white border border-[#d8c2be] hover:bg-[#fff8f6] text-[#ba1a1a] flex items-center justify-center shadow-xs transition m3-press-active cursor-pointer"
-            title="听发音"
-          >
-            <Volume2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 词语字格槽位：只显示问号 [ ? ]，只有判分后才展示真字 */}
-        <div className="flex items-center justify-center gap-2 mt-2">
-          {chars.map((c, i) => {
-            const isCurrent = i === activeCharIndex;
-            return (
-              <div
-                key={i}
-                className={`w-10 h-10 rounded-[12px] flex items-center justify-center font-bold text-lg border transition-all ${
-                  isCurrent
-                    ? 'border-2 border-[#ba1a1a] bg-[#ffdad6] text-[#410002] shadow-xs scale-105'
-                    : i < activeCharIndex
-                    ? 'border-[#2e7d32] bg-[#e8f5e9] text-[#2e7d32]'
-                    : 'border-[#d8c2be] bg-[#fdf1ee] text-[#857370]'
-                }`}
-              >
-                {/* 核心要求：写之前绝对不显示字！ */}
-                {i < activeCharIndex ? c : (isCurrent && showAnswer) ? c : '?'}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* M3 田字格画布：书写过程中绝不打断 */}
-      <div className="relative p-1.5 bg-[#fdf1ee] rounded-[26px] border border-[#d8c2be]/60 shadow-xs mb-2">
-        <div className="tianzige-box w-[260px] h-[260px] relative select-none">
-          <div className="mizige-diag-1" />
-          <div className="mizige-diag-2" />
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_SIZE}
-            height={CANVAS_SIZE}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            className="w-[260px] h-[260px] cursor-crosshair relative z-2 touch-none"
-          />
-        </div>
-
-        {/* 诊断完成后：浮层展示标准字与评分对比 */}
-        {diagnosis && (
-          <div className="absolute inset-2 bg-white/95 rounded-[24px] p-4 flex flex-col items-center justify-center z-10 animate-in fade-in duration-200 text-center">
-            {diagnosis.isCharacterCorrect ? (
-              <CheckCircle2 className="w-12 h-12 text-[#2e7d32] mb-1 animate-bounce" />
-            ) : (
-              <AlertCircle className="w-12 h-12 text-[#ba1a1a] mb-1 animate-pulse" />
-            )}
-
-            <div className="text-base font-extrabold text-[#231918]">
-              {diagnosis.isCharacterCorrect ? (diagnosis.isOrderCorrect ? '汉字与笔顺全对！' : '字写对了，笔顺有倒插笔') : '字写错啦'}
-            </div>
-
-            <div className="flex gap-1 my-1.5">
-              {[...Array(3)].map((_, i) => (
-                <span key={i} className={`text-xl ${i < diagnosis.stars ? 'opacity-100' : 'opacity-20 grayscale'}`}>
-                  ⭐
-                </span>
-              ))}
-            </div>
-
-            {/* 标准字对照展示 */}
-            <div className="p-2 bg-[#fdf1ee] rounded-xl border border-[#d8c2be]/60 my-1 text-xs text-[#534341]">
-              标准字：<span className="text-xl font-bold font-kaiti text-[#ba1a1a]">{currentChar}</span>
-            </div>
-
-            <p className="text-[11px] text-[#775651] max-w-xs mt-1">
-              {diagnosis.summaryMessage}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* 底部 M3 按钮区 */}
-      <div className="w-full max-w-xs flex flex-col gap-2 mt-2">
-        {!diagnosis ? (
-          <>
-            <div className="flex items-center gap-2 w-full">
-              <button
-                onClick={handleUndo}
-                disabled={drawnStrokes.length === 0}
-                className="flex-1 py-2 px-3 rounded-full border border-[#d8c2be] bg-[#fdf1ee] hover:bg-[#fff8f6] text-[#231918] text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed m3-press-active"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span>撤销一笔</span>
-              </button>
-
-              <button
-                onClick={handleClear}
-                disabled={drawnStrokes.length === 0}
-                className="flex-1 py-2 px-3 rounded-full border border-[#d8c2be] bg-[#fdf1ee] hover:bg-[#fff8f6] text-[#231918] text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed m3-press-active"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>清空重写</span>
-              </button>
-            </div>
-
-            {/* 核心提交按钮：完整写完再判分，中途绝不打扰 */}
-            <button
-              onClick={handleEvaluate}
-              disabled={drawnStrokes.length === 0}
-              className="w-full py-3 px-4 rounded-full bg-[#ba1a1a] hover:bg-[#9c1515] text-white text-sm font-bold shadow-xs flex items-center justify-center gap-1.5 transition m3-press-active cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Sparkles className="w-4 h-4 fill-current" />
-              <span>我写好啦！交卷判分 🚀</span>
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={handleNextCharOrFinish}
-            className="w-full py-3 px-4 rounded-full bg-[#2e7d32] hover:bg-[#1b5e20] text-white text-sm font-bold shadow-xs flex items-center justify-center gap-1.5 transition m3-press-active cursor-pointer"
-          >
-            <span>{activeCharIndex < chars.length - 1 ? '继续写下一个字 ➡️' : '查看词语批改结果 📝'}</span>
-          </button>
-        )}
-      </div>
+      {/* =================================================================== */}
+      {/* 独立全屏测验模态弹窗 (满足：单独页面 · 多格排版 · 考后判分) */}
+      {/* =================================================================== */}
+      <DictationExamModal
+        isOpen={isExamModalOpen}
+        onClose={() => setIsExamModalOpen(false)}
+        lesson={lesson}
+        onAddMistake={onAddMistake}
+        onFinishExam={(score, stars, failedChars) => {
+          onFinishExam?.(score, stars, failedChars);
+          // 同步生成 DictationResult 汇总
+          const examSummaryResults: DictationResult[] = words.map((w) => ({
+            word: w.word,
+            pinyin: w.pinyin,
+            passed: !w.word.split('').some((c) => failedChars.includes(c)),
+          }));
+          onFinish?.(examSummaryResults);
+        }}
+      />
     </div>
   );
 };

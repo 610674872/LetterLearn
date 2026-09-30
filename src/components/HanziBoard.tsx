@@ -5,6 +5,7 @@ import { RotateCcw, Volume2, Sparkles, CheckCircle2, AlertCircle, Eye, PenTool, 
 import type { CharacterItem, StrokePracticeMode } from '../types';
 import { speechService } from '../utils/speech';
 import { soundEffects } from '../utils/soundEffects';
+import { loadCharacterDataWithCache } from '../utils/strokeAnalyzer';
 import { FreeHandwritingBoard } from './FreeHandwritingBoard';
 
 interface HanziBoardProps {
@@ -25,9 +26,9 @@ export const HanziBoard: React.FC<HanziBoardProps> = ({ character, onCharacterCo
   const [earnedStars, setEarnedStars] = useState(0);
   const [standardMedians, setStandardMedians] = useState<number[][][]>([]);
 
-  // 预载当前字的骨架数据（供写完再判模式使用）
+  // 预载当前字的骨架数据（供写完再判模式使用，支持离线优先缓存）
   useEffect(() => {
-    HanziWriter.loadCharacterData(character.char)
+    loadCharacterDataWithCache(character.char)
       .then((data: any) => {
         if (data && data.medians) {
           setStandardMedians(data.medians);

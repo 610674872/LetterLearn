@@ -1,6 +1,6 @@
 // 数据模型定义
 
-export type GradeLevel = 1 | 2 | 3;
+export type GradeLevel = 1 | 2 | 3 | 4 | 5 | 6;
 export type SemesterLevel = 1 | 2;
 
 export interface CharacterItem {
@@ -19,6 +19,18 @@ export interface CharacterItem {
   }[];
 }
 
+// 听说读写一体化：经典古诗文诵读、口语交际、日积月累
+export interface OralAndReadingItem {
+  id: string;
+  type: 'recite' | 'oral' | 'reading_accumulation'; // 经典诵读 | 口语交际 | 日积月累
+  title: string;
+  author?: string; // 作者与朝代（如：唐·李白）
+  content: string; // 诵读或表达正文
+  pinyin?: string; // 拼音注音
+  guide?: string; // 名师启迪 / 口语交际表达小锦囊
+  audioText?: string; // 朗读语音文本（用于朗读发音）
+}
+
 export interface Lesson {
   id: string;
   unit: number;
@@ -30,12 +42,15 @@ export interface Lesson {
     pinyin: string;
     sentence: string;
   }[];
+  oralAndReading?: OralAndReadingItem[]; // 课文同步听说读内容
 }
 
 export interface Unit {
   unitNumber: number;
   title: string;
   lessons: Lesson[];
+  oralCommunication?: OralAndReadingItem; // 单元口语交际
+  accumulation?: OralAndReadingItem; // 单元日积月累
 }
 
 export interface TextbookCurriculum {
@@ -46,7 +61,7 @@ export interface TextbookCurriculum {
   units: Unit[];
 }
 
-export type LearningMode = 'stroke' | 'pinyin' | 'dictation';
+export type LearningMode = 'stroke' | 'pinyin' | 'dictation' | 'recite';
 export type StrokePracticeMode = 'animate' | 'trace' | 'quiz';
 export type DictationType = 'screen' | 'paper';
 
@@ -75,6 +90,9 @@ export interface MistakeRecord {
   count: number;
   lastDate: string;
   reasons: string[];
+  firstDate?: string;
+  consecutiveSuccess?: number; // 连续掌握次数 (达到2次即可彻底消除错题)
+  ebinghausStage?: number; // 艾宾浩斯复习阶段: 0: 今日新错, 1: 1天待巩固, 2: 3天复习, 3: 7天抗遗忘挑战
 }
 
 export interface UserLearningStats {
